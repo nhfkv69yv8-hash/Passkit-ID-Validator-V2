@@ -9,28 +9,34 @@ import streamlit as st
 # ---------------------------
 # Config helpers
 # ---------------------------
-def get_cfg(key: str, default: str | None = None) -> str | None:
-    v = st.secrets.get(key) if hasattr(st, "secrets") else None
-    if v is None:
-        v = os.environ.get(key, default)
-    if v is None:
+import os, time
+import streamlit as st
+import jwt
+
+def get_config(key: str):
+    val = st.secrets.get(key) or os.environ.get(key)
+    if val is None:
         return None
-    return str(v).strip()
+    return str(val).replace("\\n", "\n").strip()
 
+def get_auth_header(ttl_seconds: int = 120):
+    key = get_config("PK_API_KEY")
+    secret = get_config("PK_API_SECRET")
+    if not key or not secret:
+        st.error("❌ 請確保 Secrets/ENV 已設 PK_API_KEY 與 PK_API_SECRET")
+        return None
 
-def build_jwt_token(api_key: str, api_secret: str, ttl_seconds: int = 60) -> str:
     now = int(time.time())
-    payload = {
-        "iss": api_key,
-        "iat": now,
-        "exp": now + ttl_seconds,
-    }
-    # HS256 是最常見的 PassKit JWT 用法；若你帳戶設定是 RS256，這裡要改成 RS256 + private key
-    token = jwt.encode(payload, api_secret, algorithm="HS256")
-    # PyJWT v2 可能回傳 str；保險處理
+    payload = {"iss": key, "iat": now, "exp": now + ttl_seconds}
+
+    token = jwt.encode(payload, secret, algorithm="HS256")
     if isinstance(token, bytes):
         token = token.decode("utf-8")
-    return token
+
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
 
 
 def passkit_list_members_filtered(
