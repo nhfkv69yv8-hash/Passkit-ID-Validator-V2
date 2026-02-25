@@ -212,11 +212,12 @@ if submitted:
 
     st.success(f"完成：查詢 {len(names)} 筆，命中 {len(all_rows)} 筆。")
 
-    def render_results_table(rows: list[dict]):
-    """
-    rows: [{"搜尋姓名": "...", "會員姓名": "...", "Passkit ID": "..."}]
-    copied_key: session_state 裡用來記錄已複製的 Passkit ID
-    """
+    def render_results_table(rows):
+        """
+        rows: list of dicts
+        """
+    # 先放一行 pass 也可以，至少要有縮排內容
+        pass
 
     if not rows:
         st.info("尚無結果")
