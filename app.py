@@ -9,9 +9,6 @@ import streamlit as st
 # ---------------------------
 # Config helpers
 # ---------------------------
-import os, time
-import streamlit as st
-import jwt
 
 def get_config(key: str):
     val = st.secrets.get(key) or os.environ.get(key)
@@ -121,10 +118,10 @@ st.set_page_config(page_title="PassKit ID Validator (REST)", page_icon="🔎")
 st.title("🔎 批次查詢 PassKit Member ID（最多 50 個姓名）")
 st.caption("每行貼一個 displayName（person.displayName）。用 REST filter 一次查，不掃全量。")
 
-rest_base = get_cfg("REST_BASE")
-api_key = get_cfg("PK_API_KEY")
-api_secret = get_cfg("PK_API_SECRET")
-program_id = get_cfg("PROGRAM_ID")
+rest_base = get_config("REST_BASE")
+api_key = get_config("PK_API_KEY")
+api_secret = get_config("PK_API_SECRET")
+program_id = get_config("PROGRAM_ID")
 
 with st.expander("✅ 目前環境變數檢查", expanded=False):
     st.write({
