@@ -281,10 +281,10 @@ def render_results_table(display_rows: list[dict]):
             st.rerun()
 
 # ========= 你的原本 all_rows 結果處理：改成下面這段 =========
-if all_rows:
-    # 轉成你要的三欄
-    display_rows = []
-    for x in all_rows:
+    if all_rows:
+        # 轉成你要的三欄
+        display_rows = []
+        for x in all_rows:
         display_rows.append({
             "搜尋姓名": x.get("搜尋姓名", ""),
             "會員姓名": x.get("displayName (person.displayName)", x.get("會員姓名", "")),
@@ -302,5 +302,5 @@ if all_rows:
         file_name="passkit_member_ids.csv",
         mime="text/csv",
     )
-else:
+    else:
     st.warning("沒有找到符合名單的會員。")
