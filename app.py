@@ -225,7 +225,7 @@ if submitted:
 
     if not rows:
         st.info("尚無結果")
-        return
+    return
 
     safe_rows = []
     for r in rows:
