@@ -285,11 +285,11 @@ def render_results_table(display_rows: list[dict]):
         # 轉成你要的三欄
         display_rows = []
         for x in all_rows:
-        display_rows.append({
-            "搜尋姓名": x.get("搜尋姓名", ""),
-            "會員姓名": x.get("displayName (person.displayName)", x.get("會員姓名", "")),
-            "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
-        })
+            display_rows.append({
+                "搜尋姓名": x.get("搜尋姓名", ""),
+                "會員姓名": x.get("displayName (person.displayName)", x.get("會員姓名", "")),
+                "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
+            })
 
     render_results_table(display_rows)
 
