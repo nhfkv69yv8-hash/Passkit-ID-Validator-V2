@@ -215,7 +215,7 @@ if submitted:
     if all_rows:
         df = pd.DataFrame(all_rows)
         # Only show required columns; no cardNumber/expiryDate
-        df = df[["搜尋姓名", "displayName (person.displayName)", "memberId (member.id)"]]
+        df = df[["搜尋姓名", "會員姓名", "Passkit ID"]]
         st.dataframe(df, use_container_width=True)
 
         csv = df.to_csv(index=False).encode("utf-8-sig")
