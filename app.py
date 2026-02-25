@@ -36,7 +36,7 @@ def rest_search(names):
     missing = []
     program_id = get_config("PROGRAM_ID")
     # 對應您提到的官方 REST Prefix
-    url = f"https://api.pub1.passkit.io/members/member/list/{program_id}"
+    url = f"https://api.pub2.passkit.io/members/member/list/{program_id}"
     
     headers = get_auth_header()
     if not headers: return [], names
