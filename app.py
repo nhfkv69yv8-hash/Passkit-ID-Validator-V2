@@ -220,20 +220,20 @@ if submitted:
     import streamlit as st
     import pandas as pd
 
-    if copied_key not in st.session_state:
+        if copied_key not in st.session_state:
         st.session_state[copied_key] = set()
 
-    if not rows:
+        if not rows:
         st.info("尚無結果")
-    return
+        return
 
-    safe_rows = []
-    for r in rows:
-        safe_rows.append({
-            "搜尋姓名": r.get("搜尋姓名", ""),
-            "會員姓名": r.get("會員姓名", ""),
-            "Passkit ID": r.get("Passkit ID", ""),
-        })
+        safe_rows = []
+        f    or r in rows:
+            safe_rows.append({
+                "搜尋姓名": r.get("搜尋姓名", ""),
+                "會員姓名": r.get("會員姓名", ""),
+                "Passkit ID": r.get("Passkit ID", ""),
+            })
 
     df = pd.DataFrame(safe_rows)
 
