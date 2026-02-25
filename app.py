@@ -1,129 +1,226 @@
-import streamlit as st
-import pandas as pd
-import requests
-import time
-import jwt  # 確保 requirements.txt 有 PyJWT
 import os
+import time
+import json
+import hashlib
+import requests
+import jwt  # from PyJWT
+import pandas as pd
+import streamlit as st
 
-# 1. 基礎設定
-st.set_page_config(page_title="PassKit ID 檢索器", page_icon="🔍")
+# ----------------------------
+# Page
+# ----------------------------
+st.set_page_config(page_title="PassKit 會員批次檢索 (REST + JWT)", page_icon="🔍")
+st.title("🔍 PassKit 會員批次檢索（REST + JWT）")
+st.caption("每行貼一個 full name（PassKit: person.displayName），最多 50 行。用 REST Filter 查，不掃全量。")
 
-def get_config(key):
-    val = st.secrets.get(key) or os.environ.get(key)
-    # 解決截圖中的 TypeError: 'int' object has no attribute 'replace'
-    if val is not None:
-        return str(val).replace('\\n', '\n').strip()
-    return None
-
-# --- 2. 認證 Token 生成 (修正截圖中的 NameError: 'api' is not defined) ---
-def build_jwt_token():
-    key = get_config("PK_API_KEY")
-    secret = get_config("PK_API_SECRET")
-    
-    if not key or not secret:
+# ----------------------------
+# Config helpers
+# ----------------------------
+def get_config(key: str, default: str | None = None) -> str | None:
+    val = st.secrets.get(key) if hasattr(st, "secrets") else None
+    if val is None:
+        val = os.environ.get(key, default)
+    if val is None:
         return None
-        
+    # keep \n handling in case someone pastes multi-line values in secrets
+    return str(val).replace("\\n", "\n").strip()
+
+PK_API_KEY = get_config("PK_API_KEY")
+PK_API_SECRET = get_config("PK_API_SECRET")
+PK_API_PREFIX = get_config("PK_API_PREFIX", "https://api.pub1.passkit.io")
+PROGRAM_ID = get_config("PROGRAM_ID")
+
+missing_cfg = [k for k, v in {
+    "PK_API_KEY": PK_API_KEY,
+    "PK_API_SECRET": PK_API_SECRET,
+    "PK_API_PREFIX": PK_API_PREFIX,
+    "PROGRAM_ID": PROGRAM_ID
+}.items() if not v]
+
+if missing_cfg:
+    st.error(f"❌ 缺少設定：{', '.join(missing_cfg)}（請在 .env 或 Secrets 補上）")
+    st.stop()
+
+# ----------------------------
+# JWT auth (PassKit style)
+# - payload uses uid, iat, exp
+# - optional signature = SHA256(request body) for POST with body
+# - header Authorization = <jwt>  (NO 'Bearer ')
+# ----------------------------
+def make_jwt_for_body(body_text: str) -> str:
+    now = int(time.time())
     payload = {
-        "iss": key,
-        "iat": int(time.time()),
-        "exp": int(time.time()) + 3600
+        "uid": PK_API_KEY,
+        "iat": now,
+        "exp": now + 600,  # 10 minutes is typical for PassKit examples
     }
-    # 使用密鑰進行簽署
-    return jwt.encode(payload, secret, algorithm="HS256")
 
-# --- 3. REST API 核心搜尋邏輯 ---
-def rest_batch_search(name_list):
-    results = []
-    missing_names = []
-    program_id = get_config("PROGRAM_ID")
-    
-    # 官方 REST 端點路徑
-    url = f"https://api.pub1.passkit.io/members/member/list/{program_id}"
-    
-    token = build_jwt_token()
-    if not token:
-        st.error("❌ 無法生成認證 Token，請檢查 API Key/Secret")
-        return [], name_list
-    
+    if body_text:
+        payload["signature"] = hashlib.sha256(body_text.encode("utf-8")).hexdigest()
+
+    token = jwt.encode(payload, PK_API_SECRET, algorithm="HS256")
+    # PyJWT may return bytes in older versions; normalize
+    if isinstance(token, bytes):
+        token = token.decode("utf-8")
+    return token
+
+def post_list_members(filters_payload: dict) -> list[dict]:
+    """
+    Calls:
+      POST {PK_API_PREFIX}/members/member/list/{PROGRAM_ID}
+    Returns:
+      list of result objects (each line may be a JSON object)
+    """
+    url = f"{PK_API_PREFIX.rstrip('/')}/members/member/list/{PROGRAM_ID}"
+    body_text = json.dumps({"filters": filters_payload}, separators=(",", ":"), ensure_ascii=False)
+
+    token = make_jwt_for_body(body_text)
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "Authorization": token,  # PassKit examples: token directly, not Bearer
+        "Content-Type": "application/json",
     }
 
-    search_names = [n.strip() for n in name_list if n.strip()][:50]
-    progress_bar = st.progress(0)
+    resp = requests.post(url, headers=headers, data=body_text, timeout=30)
 
-    for idx, name in enumerate(search_names):
+    # Common failure hints
+    if resp.status_code == 404:
+        raise RuntimeError(
+            "404 Not Found：多半是 API Prefix 用錯（pub1/pub2），或 endpoint path 拼錯。"
+        )
+    if resp.status_code in (401, 403):
+        raise RuntimeError(
+            f"Auth 失敗（{resp.status_code}）：請確認 PK_API_KEY/PK_API_SECRET、以及 API Prefix（pub1/pub2）。"
+        )
+    if not resp.ok:
+        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+
+    # PassKit list APIs sometimes return NDJSON (one JSON per line)
+    text = resp.text.strip()
+    if not text:
+        return []
+
+    items: list[dict] = []
+    # Try NDJSON first
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    for ln in lines:
         try:
-            # 構建符合 member_pb2.py 過濾器定義的 JSON
-            body = {
-                "filters": {
-                    "filterGroups": [
-                        {
-                            "condition": "AND",
-                            "fieldFilters": [
-                                {
-                                    "filterField": "person.displayName",
-                                    "filterValue": name,
-                                    "filterOperator": "eq"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
+            items.append(json.loads(ln))
+        except json.JSONDecodeError:
+            # maybe it's a single JSON
+            items = [json.loads(text)]
+            break
 
-            resp = requests.post(url, headers=headers, json=body)
-            
-            if resp.status_code == 200:
-                data = resp.json()
-                # 根據 SDK 結構提取成員資訊
-                members = data.get('members', [])
-                if members:
-                    for m in members:
-                        person = m.get('person', {})
-                        # ✅ 符合要求：搜尋姓名、稱謂、系統名、Passkit ID (放最後)
-                        results.append({
-                            "搜尋姓名": name.upper(),
-                            "稱謂 person.salutation": person.get('salutation', ''),
-                            "系統名 person.displayName": person.get('displayName', ''),
-                            "Passkit ID": m.get('id', '') 
-                        })
-                else:
-                    missing_names.append(name)
-            elif resp.status_code == 401:
-                st.error("🔑 認證失敗 (401): 請檢查 API Key 和 Secret 是否正確")
-                break
-            
+    return items
+
+def extract_member_rows(list_response_items: list[dict], search_name: str, max_hits: int) -> list[dict]:
+    """
+    Each item is typically:
+      { "result": { ...member... } , ... }
+    We'll extract: person.displayName, id
+    """
+    rows = []
+    for item in list_response_items:
+        member = item.get("result") or item.get("member") or item
+        if not isinstance(member, dict):
+            continue
+
+        person = member.get("person") or {}
+        display_name = (person.get("displayName") or "").strip()
+        member_id = (member.get("id") or "").strip()
+
+        if display_name and member_id:
+            rows.append({
+                "搜尋姓名": search_name,
+                "displayName (person.displayName)": display_name,
+                "memberId (member.id)": member_id,
+            })
+
+        if len(rows) >= max_hits:
+            break
+    return rows
+
+def search_by_display_name(name: str, max_hits: int, operator: str) -> list[dict]:
+    # REST filter fields: displayName, operators: eq / like, etc. :contentReference[oaicite:2]{index=2}
+    filters = {
+        "limit": min(max_hits, 1000),
+        "offset": 0,
+        "filterGroups": [{
+            "condition": "AND",
+            "fieldFilters": [{
+                "filterField": "displayName",
+                "filterValue": name,
+                "filterOperator": operator,  # "eq" or "like"
+            }]
+        }]
+    }
+    items = post_list_members(filters)
+    return extract_member_rows(items, name, max_hits=max_hits)
+
+# ----------------------------
+# UI
+# ----------------------------
+with st.form("search_form"):
+    input_text = st.text_area(
+        "每行一個 full name（person.displayName）— 最多 50 行",
+        height=220,
+        placeholder="HSIUTING CHOU\nKUANYEN LEE\n..."
+    )
+
+    colA, colB, colC = st.columns([1, 1, 2])
+    with colA:
+        max_hits = st.number_input("同名最多回傳筆數", min_value=1, max_value=50, value=5, step=1)
+    with colB:
+        operator = st.selectbox("比對方式", options=["eq", "like"], index=0)
+    with colC:
+        st.caption("eq = 完全相同；like = 包含（較鬆，可能會回更多結果）")
+
+    submitted = st.form_submit_button("Search")
+
+if submitted:
+    names = [n.strip() for n in (input_text or "").splitlines() if n.strip()]
+    if not names:
+        st.warning("請先貼上至少一行姓名。")
+        st.stop()
+
+    if len(names) > 50:
+        st.warning(f"你貼了 {len(names)} 行，系統只會取前 50 行。")
+        names = names[:50]
+
+    all_rows = []
+    missing = []
+
+    prog = st.progress(0)
+    status = st.empty()
+
+    for i, name in enumerate(names, start=1):
+        status.info(f"查詢中 {i}/{len(names)}：{name}")
+        try:
+            rows = search_by_display_name(name, max_hits=int(max_hits), operator=operator)
+            if rows:
+                all_rows.extend(rows)
+            else:
+                missing.append(name)
         except Exception as e:
-            st.error(f"搜尋 {name} 時發生異常: {e}")
-            
-        progress_bar.progress((idx + 1) / len(search_names))
+            st.error(f"❌ 查詢失敗：{name} → {e}")
+            missing.append(name)
 
-    progress_bar.empty()
-    return results, missing_names
+        prog.progress(i / len(names))
 
-# --- 4. 網頁介面 ---
-st.title("📑 會員 Passkit ID 批次檢索 (REST)")
-st.write("直接呼叫 api.pub1.passkit.io 進行精確過濾。")
+    status.empty()
+    prog.empty()
 
-input_text = st.text_area("請輸入姓名名單 (每行一個)", height=250, placeholder="CHAN TAI MAN\nWONG SIU MING")
+    st.success(f"完成：查詢 {len(names)} 筆，命中 {len(all_rows)} 筆。")
 
-if st.button("執行批次搜尋", type="primary"):
-    if not input_text.strip():
-        st.warning("請輸入姓名。")
-    else:
-        names = input_text.split('\n')
-        with st.spinner("正在進行 REST API 檢索..."):
-            matches, missing = rest_batch_search(names)
-            
-            if matches:
-                st.success(f"✅ 搜尋完成！找到 {len(matches)} 筆相符資料。")
-                df = pd.DataFrame(matches)
-                # 修正語法錯誤並強制排序欄位
-                display_df = df[["搜尋姓名", "稱謂 person.salutation", "系統名 person.displayName", "Passkit ID"]]
-                st.dataframe(display_df, use_container_width=True)
-            
-            if missing:
-                with st.expander("❌ 未找到名單"):
-                    st.write(", ".join(missing))
+    if all_rows:
+        df = pd.DataFrame(all_rows)
+        # Only show required columns; no cardNumber/expiryDate
+        df = df[["搜尋姓名", "displayName (person.displayName)", "memberId (member.id)"]]
+        st.dataframe(df, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
+
+    if missing:
+        with st.expander(f"未找到名單（{len(missing)}）"):
+            st.write("\n".join(missing))
