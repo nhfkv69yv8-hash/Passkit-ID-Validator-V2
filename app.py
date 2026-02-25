@@ -214,6 +214,7 @@ if submitted:
 
     if all_rows:
         # 轉成你要的三欄
+        df = pd.DataFrame(all_rows)
         display_rows = []
         for x in all_rows:
             display_rows.append({
@@ -222,7 +223,7 @@ if submitted:
                 "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
             })
 
-        render_results_table(display_rows)
+        st.dataframe(df, use_container_width=True)
 
         csv = df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
