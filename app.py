@@ -162,14 +162,14 @@ def search_by_display_name(name: str, max_hits: int, operator: str) -> list[dict
 # ----------------------------
 with st.form("search_form"):
     input_text = st.text_area(
-        "每行一個 full name（person.displayName）— 最多 50 行",
+        "每行一個 full name（person.displayName）— 最多 150 行",
         height=220,
         placeholder="HSIUTING CHOU\nKUANYEN LEE\n..."
     )
 
     colA, colB, colC = st.columns([1, 1, 2])
     with colA:
-        max_hits = st.number_input("同名最多回傳筆數", min_value=1, max_value=50, value=5, step=1)
+        max_hits = st.number_input("同名最多回傳筆數", min_value=1, max_value=150, value=5, step=1)
     with colB:
         operator = st.selectbox("比對方式", options=["eq", "like"], index=0)
     with colC:
@@ -183,8 +183,8 @@ if submitted:
         st.warning("請先貼上至少一行姓名。")
         st.stop()
 
-    if len(names) > 50:
-        st.warning(f"你貼了 {len(names)} 行，系統只會取前 50 行。")
+    if len(names) > 150:
+        st.warning(f"你貼了 {len(names)} 行，系統只會取前 150 行。")
         names = names[:50]
 
     all_rows = []
