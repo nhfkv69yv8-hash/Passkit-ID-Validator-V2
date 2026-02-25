@@ -213,10 +213,16 @@ if submitted:
     st.success(f"完成：查詢 {len(names)} 筆，命中 {len(all_rows)} 筆。")
 
     if all_rows:
-        df = pd.DataFrame(all_rows)
-        # Only show required columns; no cardNumber/expiryDate
-        df = df[["搜尋姓名", "displayName (person.displayName)", "memberId (member.id)"]]
-        st.dataframe(df, use_container_width=True)
+    # 轉成你要的三欄
+    display_rows = []
+    for x in all_rows:
+        display_rows.append({
+            "搜尋姓名": x.get("搜尋姓名", ""),
+            "會員姓名": x.get("displayName (person.displayName)", x.get("會員姓名", "")),
+            "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
+        })
+
+    render_results_table(display_rows)
 
         csv = df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
