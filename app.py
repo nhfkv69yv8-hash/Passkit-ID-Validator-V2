@@ -223,7 +223,7 @@ if submitted:
                 "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
             })
 
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width='stretch')
 
         csv = df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
