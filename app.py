@@ -10,9 +10,9 @@ import streamlit as st
 # ----------------------------
 # Page
 # ----------------------------
-st.set_page_config(page_title="PassKit 會員批次檢索 (REST + JWT)", page_icon="🔍")
-st.title("🔍 PassKit 會員批次檢索（REST + JWT）")
-st.caption("每行貼一個 full name（PassKit: person.displayName），最多 50 行。用 REST Filter 查，不掃全量。")
+st.set_page_config(page_title="PassKit 重複 ID 搜尋工具", page_icon="🔍")
+st.title("🔍 PassKit 重複 ID 搜尋工具")
+st.caption("每行貼一個 full name（PassKit: person.displayName），最多 150 行。用 REST Filter 查，不掃全量。")
 
 # ----------------------------
 # Config helpers
