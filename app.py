@@ -228,6 +228,20 @@ if submitted:
         csv = df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
 
-    if missing:
-        with st.expander(f"未找到名單（{len(missing)}）"):
-            st.write("\n".join(missing))
+    if not_found:
+    with st.expander(f"❌ 未找到名單（{len(not_found)}）", expanded=False):
+
+        # 一列顯示幾個框（可調）
+        cols_per_row = 4
+
+        # 分批渲染成 grid
+        for i in range(0, len(not_found), cols_per_row):
+            cols = st.columns(cols_per_row)
+            chunk = not_found[i:i + cols_per_row]
+            for j, name in enumerate(chunk):
+                with cols[j]:
+                    with st.container(border=True):
+                        st.markdown(
+                            f"<div style='text-align:center; font-weight:600; padding:6px 0;'>{name}</div>",
+                            unsafe_allow_html=True
+                        )
