@@ -235,7 +235,7 @@ if submitted:
 
         for i in range(0, len(missing), cols_per_row):
             cols = st.columns(cols_per_row)
-            chunk = not_found[i:i + cols_per_row]
+            chunk = missing[i:i + cols_per_row]
 
             for j, name in enumerate(chunk):
                 with cols[j]:
