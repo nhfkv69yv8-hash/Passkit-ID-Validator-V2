@@ -230,7 +230,7 @@ if submitted:
 
     # ✅ 未找到名單：每個名字用框線區隔（grid）
     if not_found:
-        with st.expander(f"❌ 未找到名單 ({len(not_found)})", expanded=False):
+        with st.expander(if"❌ 未找到名單 ({len(not_found)})", expanded=False):
             cols_per_row = 4  # 一列幾個框，可調 3/4/5
 
         for i in range(0, len(not_found), cols_per_row):
