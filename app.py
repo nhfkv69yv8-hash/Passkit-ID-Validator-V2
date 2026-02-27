@@ -10,8 +10,8 @@ import streamlit as st
 # ----------------------------
 # Page
 # ----------------------------
-st.set_page_config(page_title="PassKit 重複會員 ID 搜尋工具", page_icon="🔍")
-st.title("🔍 PassKit 重複會員 ID 搜尋工具")
+st.set_page_config(page_title="PassKit 重複 ID 搜尋工具", page_icon="🔍")
+st.title("🔍 PassKit 重複 ID 搜尋工具")
 st.caption("每行貼一個 full name（PassKit: person.displayName），最多 150 行。用 REST Filter 查，不掃全量。")
 
 # ----------------------------
@@ -223,65 +223,11 @@ if submitted:
                 "Passkit ID": x.get("memberId (member.id)", x.get("Passkit ID", "")),
             })
 
-        st.dataframe(df, width='stretch')
+        st.dataframe(df, use_container_width=True)
 
         csv = df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("下載 CSV", data=csv, file_name="passkit_member_ids.csv", mime="text/csv")
 
-# ✅ 未找到名單：每個名字用框線區隔（grid）
-def missing_grid(missing: list[dict]):
     if missing:
-        st.markdown(f"### ❌ 未找到名單（{len(missing)}）")
-           
-        with st.expander("點我展開", expanded=False):
-        # 用純 HTML/CSS grid，避免 st.columns 的 gutter / scope 問題
-            cards_html = []
-            for nm in missing:
-                safe_nm = (nm or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                cards_html.append(f'<div class="name-pill">{safe_nm}</div>')
-
-            st.markdown(
-                f"""
-                <style>
-                  .missing-wrap {{
-                    width: 100%;
-                    margin: 0;
-                    padding: 0;
-                  }}
-                  .missing-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(4, minmax(0, 1fr));
-                    gap: 16px;              /* ✅ 統一上下左右間距 */
-                    margin-top: 12px;
-                  }}
-                  .name-pill {{
-                    border: 1px solid #ddd;
-                    border-radius: 12px;
-                    padding: 16px 12px;
-                    text-align: center;
-                    font-weight: 800;
-                    background: #fafafa;
-                    line-height: 1.2;
-                    min-height: 56px;        /* ✅ 高度一致 */
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                  }}
-
-                  /* 手機/窄螢幕自動改欄數（可選） */
-                  @media (max-width: 900px) {{
-                   .missing-grid {{ grid-template-columns: repeat(3, minmax(0, 1fr)); }}
-                  }}
-                  @media (max-width: 650px) {{
-                    .missing-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
-                  }}
-                </style>
-
-                <div class="missing-wrap">
-                  <div class="missing-grid">
-                    {''.join(cards_html)}
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        with st.expander(f"未找到名單（{len(missing)}）"):
+            st.write("\n".join(missing))
